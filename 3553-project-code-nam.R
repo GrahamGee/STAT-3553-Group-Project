@@ -1,10 +1,8 @@
 
 library(tidyverse) # this is for ggplot2 and all of that stuff
 library(readxl) # This library is used to read the excel table in. Prevents the need to convert over to csv as we received the files in xlsx format.
+library(lars)
 
-library(faraway) # for vif function
-library(corrplot) # for nice correlation plots
-library(lubridate)
 
 # Loading in the data ------------------------------------------------
 
@@ -85,18 +83,11 @@ m_foot <- m_foot |>
 # Here I am binding all the dataframes together into one large dataframe.
 data <- bind_rows(m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
 
-# I am clearing up the environment of the old dataframes. 
-rm(m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
-
-
-# Multi-collinearity Checks ------------------------------------------------
 
 # Here I've subsetted our large data set into a smaller one that contains only the columns from sex on wards. Clearly we don't need the jump id and so forth. 
 data2 <- data |> 
   select(sex:`Relative Propulsive Net Impulse`)
 
-data2$sex
-  
 # I'm rearranging the columns here so that they are listed alphabetically to better match the data dictionary
 data2 <- data2 |> 
   mutate(
@@ -104,14 +95,42 @@ data2 <- data2 |>
     sport = as.factor(sport)
   ) |> 
   select(order(colnames(data2))) |> 
-  relocate(where(is.numeric), .after = where(is.factor)) 
+  relocate(where(is.numeric), .after = where(is.factor)) |> 
+  na.omit() # this last line omits rows with NA's in them (need to look at this again)
 
-# This is the correlation matrix 
-cor_matrix <- cor(data2[3:81], use="complete.obs")
+rm(data, m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
 
-# Model Diagnostics -------------------------------------------------------
+# Multicollinearity checks ------------------------------------------------
 
-data2 <- na.omit(data2)
+library(reshape2)
+cor_2 <- round(cor(data2[3:81], use="complete.obs"),2)
+
+CM <- cor_2
+CM[lower.tri(CM, diag=TRUE)] <- NA
+
+threshold <- 0.30
+
+cor_predictors <- subset(melt(CM, na.rm=TRUE), abs(value) <= (threshold))
+
+cor_predictors_2 <- cor_predictors |> 
+  filter(Var1 == "Jump Height")
+
+print(cor_predictors_2$Var2)
+
+data3 <- data2 |> 
+  select()
+
+# LASSO  -----------------------------------------------------------------
+
+which(colnames(design_matrix) == "`Jump Height`")
+
+design_matrix <- model.matrix(~ . -1, data = data2)
+
+lmod <- lars(design_matrix[,-27], data2$`Jump Height`)
+lmod
+
+# Model Diagnostics After MC and LASSO -------------------------------------------------------
+
 mod_1 <- lm(`Jump Height` ~ ., data = data2)
 mod_residuals <- residuals(mod_1)
 mod_fitted <- fitted(mod_1)
@@ -135,56 +154,12 @@ qqline(mod_residuals) # clearly this doesn't look normal.
 shapiro.test(mod_residuals) # This won't work because Shapiro Test only takes sample size between 3 and 5000. 
 
 
-# LASSO  -----------------------------------------------------------------
+# Check for autocorrelation -----------------------------------------------
 
 
+# Check for influential points --------------------------------------------
 
 
-# PCA -------------------------------------------------------------------
+# PCA Test ----------------------------------------------------------------
 
-# Multi-Collinearity Checks -----------------------------------------------
-
-# Nam's Method ------------------------------------------------------------
-library(reshape2)
-cor_2 <- round(cor(data2[3:81], use="complete.obs"),2)
-
-
-CM <- cor_2
-CM[lower.tri(CM, diag=TRUE)] <- NA
-cor_predictors <- subset(melt(CM, na.rm=TRUE), value >= abs(.85))
-cor_predictors
-# The next two lines of code tell us the number of unique variables that are correlated with each other.
-length(unique(cor_predictors$Var1))
-length(unique(cor_predictors$Var2))
-
-
-# Lasso Regression --------------------------------------------------------
-
-
-# PCA Regression ----------------------------------------------------------
-
-
-
-# Graham's Method ---------------------------------------------------------
-
-# indices <- which(lower.tri(cor_matrix, diag = FALSE), arr.ind = TRUE)
-#
-# highMC <- matrix()
-#
-# for (idx in 1:nrow(indices)) {
-#   i <- indices[idx, 1]
-#   j <- indices[idx, 2]
-#   if(cor_matrix[i,j] > 0.8){
-#     highMC<-cbind(highMC,cor_matrix[i,j])
-#   }
-# }
-#
-# #Printing values with high MC value
-# print("The values with a high Value of multicollinearity are:")
-# print(highMC)
-
-# Remove values with high VIF from remaining 
-
-# Now we need to drop the columns that are highly correlated with each other. From here, we will need to refit our model. 
-# We'll need to further drop variables as our model is still quite large. We could increase the threshold value as well
 
