@@ -158,16 +158,17 @@ repeat {
   }
 }
 vif(mod_2)
+
 # Model Diagnostics After MC and LASSO -------------------------------------------------------
 
-mod_1 <- lm(`Jump Height` ~ ., data = data2)
-mod_residuals <- residuals(mod_1)
-mod_fitted <- fitted(mod_1)
+mod_3 <- lm(`Jump Height` ~ -sex -sport., data = data4)
+mod_residuals <- residuals(mod_3)
+mod_fitted <- fitted(mod_3)
 
 length(mod_residuals)
 length(mod_fitted)
 
-plot <- ggplot(data2, aes(x = mod_fitted, y = mod_residuals)) +
+plot <- ggplot(data4, aes(x = mod_fitted, y = mod_residuals)) +
   geom_point() + xlab("Model Fitted Values") +ylab("Model Residuals") + 
   geom_hline(yintercept = 0)
 plot
@@ -189,16 +190,14 @@ shapiro.test(mod_residuals) # This won't work because Shapiro Test only takes sa
 # Check for influential points --------------------------------------------
 # LASSO  -----------------------------------------------------------------
 
-design_matrix <- model.matrix(~ . -1, data = data2)
+design_matrix <- model.matrix(~ . -1, data = data4)
 
 which(colnames(design_matrix) == "`Jump Height`")
 
 
-lmod <- lars(design_matrix[,-27], data2$`Jump Height`)
-min(round(lmod$Cp,2))
-
-
-
+lmod <- lars(design_matrix[,-10], data2$`Jump Height`)
+lmod
+round(lmod$Cp,2)
 # PCA Test ----------------------------------------------------------------
 
 
