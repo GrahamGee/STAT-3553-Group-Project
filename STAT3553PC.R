@@ -2,6 +2,7 @@ library(tidyverse)
 library(readxl)
 library(lars)
 library(faraway)
+library(MASS)
 
 # Loading in the data ------------------------------------------------
 
@@ -238,6 +239,7 @@ halfnorm(cookDat,3,ylab="Cook’s distances",xlim=c(0,4)) #Given the removed poi
 
 par(mfrow=c(2,2))
 plot(mod_4)
+#Eliminating influential points did not result in any significant change, likely due to the size of the dataset.
 
 # Box-Cox Transformation  -----------------------------------------------------------------
 
@@ -272,3 +274,83 @@ round(lmod$Cp,2)
 
 # PCA Test ----------------------------------------------------------------
 
+#Will start by using data3
+data3Scaled<-scale(data3[,c(-1:-2,-23)])
+pcaTestData3<-prcomp(data3Scaled,center=TRUE,scale.=TRUE)
+print(summary(pcaTestData3))
+
+#Try with data4 after vif eliminations
+data4Scaled<-scale(data4[c(-1:-2,-6)])
+pcaTestData4<-prcomp(data4Scaled,center=TRUE,scale.=TRUE)
+print(summary(pcaTestData4))
+
+#Try with data5 after eliminating outliers
+data5Scaled<-scale(data5[c(-1:-2,-6)])
+pcaTestData5<-prcomp(data5Scaled,center=TRUE,scale.=TRUE)
+print(summary(pcaTestData5))
+
+#Plotting the standard deviation of principal components
+par(mfrow=c(2,2))
+plot(pcaTestData3$sdev,type="l",ylab="SD of PC", xlab="PC number",main="57 Variables")
+plot(pcaTestData4$sdev,type="l",ylab="SD of PC", xlab="PC number",main="7 Variables")
+plot(pcaTestData5$sdev,type="l",ylab="SD of PC", xlab="PC number",main="7 Variables, no Outliers")
+
+par(mfrow=c(1,1))
+robData3 <- cov.rob(data3Scaled)#find the center and Sigma
+md <- mahalanobis(data3Scaled, center=robData3$center, cov=robData3$cov)
+n <- nrow(data3Scaled);p <- ncol(data3Scaled)
+plot(qchisq(1:n/(n+1),p), sort(md), xlab=expression(paste(chi^2,"
+quantiles")), ylab="Sorted Mahalanobis distances")
+abline(0,1) #This doesn't work as the x's are collinear
+
+robData4 <- cov.rob(data4Scaled)#find the center and Sigma
+md <- mahalanobis(data4Scaled, center=robData4$center, cov=robData4$cov)
+n <- nrow(data4Scaled);p <- ncol(data4Scaled)
+plot(qchisq(1:n/(n+1),p), sort(md), xlab=expression(paste(chi^2,"
+quantiles")), ylab="Sorted Mahalanobis distances")
+abline(0,1) #This works
+
+robData5 <- cov.rob(data5Scaled)#find the center and Sigma
+md <- mahalanobis(data5Scaled, center=robData5$center, cov=robData5$cov)
+n <- nrow(data5Scaled);p <- ncol(data5Scaled)
+plot(qchisq(1:n/(n+1),p), sort(md), xlab=expression(paste(chi^2,"
+quantiles")), ylab="Sorted Mahalanobis distances")
+abline(0,1)
+
+#Rotation Matrices
+data3Rotation<-pcaTestData3$rotation
+data4Rotation<-pcaTestData4$rotation
+data5Rotation<-pcaTestData5$rotation
+
+print(round(data3Rotation[,5],2))
+print(round(data4Rotation[,5],2))
+print(round(data5Rotation[,5],2))
+
+
+# Comparing 5th pca values for response vars in dataset 4 with themselves in dataset 3 ------------------------
+
+# Ensure row names are consistent between the two matrices
+rows_to_extract <- rownames(data4Rotation)
+
+# Extract corresponding rows from data3Rotation
+filtered_data3Rotation <- data3Rotation[rows_to_extract, ]
+
+# Combine the two for comparison
+comparison <- list(
+  data3 = filtered_data3Rotation,
+  data4 = data4Rotation
+)
+
+# Create a data frame for side-by-side comparison
+comparison_df <- data.frame(
+  Variable = rows_to_extract,
+  data3_PC5 = round(filtered_data3Rotation[, "PC5"], 4),
+  data4_PC5 = round(data4Rotation[, "PC5"], 4)
+)
+
+print(comparison_df)
+
+#Lets also look at the top 10 values of the pca test of dataset 3
+temp<-order(data3Rotation[,"PC5"],decreasing = TRUE)
+bestVals<-rownames(temp[1:10])
+print(bestVals)
