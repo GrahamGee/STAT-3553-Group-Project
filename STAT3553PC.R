@@ -83,10 +83,9 @@ m_foot <- m_foot |>
 # Here I am binding all the dataframes together into one large dataframe.
 data <- bind_rows(m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
 
-
 # Here I've subsetted our large data set into a smaller one that contains only the columns from sex on wards. Clearly we don't need the jump id and so forth. 
 data2 <- data |> 
-  select(sex:`Relative Propulsive Net Impulse`)
+  dplyr::select(sex:`Relative Propulsive Net Impulse`)
 
 # I'm rearranging the columns here so that they are listed alphabetically to better match the data dictionary
 data2 <- data2 |> 
@@ -94,11 +93,26 @@ data2 <- data2 |>
     sex = as.factor(sex),  
     sport = as.factor(sport)
   ) |> 
-  select(order(colnames(data2))) |> 
+  dplyr::select(order(colnames(data2))) |> 
   relocate(where(is.numeric), .after = where(is.factor)) |> 
   na.omit() # this last line omits rows with NA's in them (need to look at this again)
 
 rm(data, m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
+
+# Basic plot of all jump heights ------------------------------------------------
+plot(data2$`Jump Height`,ylim=c(0,1))
+
+# LASSO on whole model ------------------------------------------------
+
+design_matrix0 <- model.matrix(~ . -1, data = data2)
+#modeDat5<-mode(design_matrix0)
+
+indexJH<-which(colnames(design_matrix0) == "`Jump Height`")
+
+
+lmod <- lars(design_matrix0[,-indexJH], data2$`Jump Height`)
+lmod
+round(lmod$Cp,2)
 
 # Multicollinearity checks ------------------------------------------------
 
@@ -118,7 +132,7 @@ cor_predictors_2 <- cor_predictors |>
 
  
 data3 <- data2 |> 
-  select(-c(cor_predictors_2$Var2))
+  dplyr::select(-c(cor_predictors_2$Var2))
 
 
 # VIF Check ---------------------------------------------------------------
@@ -128,7 +142,7 @@ data3 <- data2 |>
 
 
 data4 <- data3 |> 
-  select(-c(`Left Force at Peak Propulsive Force`, `Left Force at Peak Braking Force`, `Left Avg. Propulsive Force`, `Left Avg. Braking RFD`, `Left Avg. Braking Force`, `Left Force at Peak Landing Force`))
+  dplyr::select(-c(`Left Force at Peak Propulsive Force`, `Left Force at Peak Braking Force`, `Left Avg. Propulsive Force`, `Left Avg. Braking RFD`, `Left Avg. Braking Force`, `Left Force at Peak Landing Force`))
 
 mod_1 <- lm(`Jump Height` ~ . -sex -sport, data = data4)
 
@@ -139,7 +153,7 @@ high_vif <- str_remove_all(names(which.max(vif(mod_1))),"`")
 list_of_vif <- append(list_of_vif , high_vif)
 
 data4 <- data4 |> 
-  select(-c(high_vif))
+  dplyr::select(-c(high_vif))
   
 mod_2 <- lm(`Jump Height` ~ . -sex -sport, data = data4)
 
@@ -149,7 +163,7 @@ repeat {
   list_of_vif <- append(list_of_vif , high_vif)
   
   data4 <- data4 |> 
-    select(-c(high_vif))
+    dplyr::select(-c(high_vif))
   
   mod_2 <- lm(`Jump Height` ~ . -sex -sport, data = data4)
   vif(mod_2)
@@ -193,10 +207,10 @@ par(mfrow=c(1,1))
 
 # Remove Outliers  ------------------------------------------
 
+
 removeOutl<-function(dat){ #Function to remove outliers
   mod <- lm(`Jump Height` ~ .-sex -sport, data = dat)
   studresiduals<-rstudent(mod)
-  
   dat <- dat[abs(studresiduals)<3, ]
   print(range(rstudent(mod)))
   
@@ -216,11 +230,21 @@ while(TRUE){
   } else {break}
   
 }
+
 print("Removed all outliers")
 print(range(rstudent(mod_4)))
 
+#Get the removed values
+removedVals<-setdiff(data4,data5)
+
 par(mfrow=c(2,2))
 plot(mod_4) #Observe new model without outliers
+
+# Checking what values are Outliers  -----------------------------------------------
+par(mfrow=c(1,2))
+plot(data2$`Jump Height`,ylim=c(0,1))
+plot(removedVals$`Jump Height`,ylim=c(0,1),col="red")
+
 
 # Check for autocorrelation -----------------------------------------------
 
@@ -296,12 +320,12 @@ plot(pcaTestData4$sdev,type="l",ylab="SD of PC", xlab="PC number",main="7 Variab
 plot(pcaTestData5$sdev,type="l",ylab="SD of PC", xlab="PC number",main="7 Variables, no Outliers")
 
 par(mfrow=c(1,1))
-robData3 <- cov.rob(data3Scaled)#find the center and Sigma
-md <- mahalanobis(data3Scaled, center=robData3$center, cov=robData3$cov)
-n <- nrow(data3Scaled);p <- ncol(data3Scaled)
-plot(qchisq(1:n/(n+1),p), sort(md), xlab=expression(paste(chi^2,"
-quantiles")), ylab="Sorted Mahalanobis distances")
-abline(0,1) #This doesn't work as the x's are collinear
+#robData3 <- cov.rob(data3Scaled)#find the center and Sigma
+#md <- mahalanobis(data3Scaled, center=robData3$center, cov=robData3$cov)
+#n <- nrow(data3Scaled);p <- ncol(data3Scaled)
+#plot(qchisq(1:n/(n+1),p), sort(md), xlab=expression(paste(chi^2,"
+#quantiles")), ylab="Sorted Mahalanobis distances")
+#abline(0,1) #This doesn't work as the x's are collinear
 
 robData4 <- cov.rob(data4Scaled)#find the center and Sigma
 md <- mahalanobis(data4Scaled, center=robData4$center, cov=robData4$cov)
@@ -311,9 +335,9 @@ quantiles")), ylab="Sorted Mahalanobis distances")
 abline(0,1) #This works
 
 robData5 <- cov.rob(data5Scaled)#find the center and Sigma
-md <- mahalanobis(data5Scaled, center=robData5$center, cov=robData5$cov)
-n <- nrow(data5Scaled);p <- ncol(data5Scaled)
-plot(qchisq(1:n/(n+1),p), sort(md), xlab=expression(paste(chi^2,"
+md1 <- mahalanobis(data5Scaled, center=robData5$center, cov=robData5$cov)
+n1 <- nrow(data5Scaled);p <- ncol(data5Scaled)
+plot(qchisq(1:n1/(n1+1),p), sort(md1), xlab=expression(paste(chi^2,"
 quantiles")), ylab="Sorted Mahalanobis distances")
 abline(0,1)
 
@@ -351,6 +375,17 @@ comparison_df <- data.frame(
 print(comparison_df)
 
 #Lets also look at the top 10 values of the pca test of dataset 3
-temp<-order(data3Rotation[,"PC5"],decreasing = TRUE)
-bestVals<-rownames(temp[1:10])
-print(bestVals)
+temp<-sort(abs(data3Rotation[,"PC5"]),decreasing=TRUE)[1:10]
+
+#mod_8 <- lm(`Jump Height` ~ pcaTestData3[,'PC5'])
+
+# Interactions ----------------------------------------------------------------
+mod_5 <- lm(`Jump Height`~`sex`*`sport`*`Impulse Ratio`,data=data5)
+print(summary(mod_5))
+
+mod_6 <- lm(`Jump Height`~`sex`*`sport`+.,data=data5)
+print(summary(mod_6))
+
+mod_7 <- lm(`Jump Height`~`sex`*`sport`*.,data=data5)
+print(summary(mod_7))
+
