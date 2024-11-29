@@ -3,7 +3,8 @@ library(readxl)
 library(lars)
 library(faraway)
 library(MASS)
-
+library(pls)
+set.seed(1234)
 # Loading in the data ------------------------------------------------
 
 m_basket <- read_excel(path="~/Data Analytics/STAT 3553/Project/CMJ_IMTP Data/Men's Basketball_CMJ.xlsx")
@@ -379,6 +380,41 @@ temp<-sort(abs(data3Rotation[,"PC5"]),decreasing=TRUE)[1:10]
 
 #mod_8 <- lm(`Jump Height` ~ pcaTestData3[,'PC5'])
 
+# Partial Least Squares Regression ----------------------------------------------------------------
+par(mfrow=c(3,3))
+
+rmse <- function(x,y) sqrt(mean((x-y)^2))
+data3test2<-data3[c(7001:nrow(data3)),]
+
+for(i in 0:8) { #9 fold cross validation
+  start_idx <- i * 700 + 1
+  end_idx <- start_idx + 699
+  data3test<-data3[start_idx:end_idx,]
+  plsrData3<-plsr(`Jump Height` ~ .-sex -sport,data = data3test, ncomp=10,scale=FALSE,validation="CV") #PLSR Model for data 3
+  #summary(plsrData3)
+
+  #coefplot(plsrData3, ncomp=5, xlab="Frequency")
+  print("Predictors")
+  print(plsrData3$loadings)
+  Sys.sleep(60)
+  
+  plsData3 <- RMSEP(plsrData3, estimate="CV")
+  plot(plsData3,main=i)
+  
+  ypred <- predict(plsrData3,ncomp=10)
+  print(rmse(ypred, data3test$`Jump Height`))
+  Sys.sleep(0.5)
+  
+  ytpred <- predict(plsrData3, data3test2, ncomp=10)
+  print(rmse(ytpred, data3test2$`Jump Height`))
+  Sys.sleep(0.5)
+  print("")
+  
+}
+
+#RMSE is close on all of them so that is good
+#Change data3 to data5 to test with outliers
+
 # Interactions ----------------------------------------------------------------
 mod_5 <- lm(`Jump Height`~`sex`*`sport`*`Impulse Ratio`,data=data5)
 print(summary(mod_5))
@@ -388,4 +424,3 @@ print(summary(mod_6))
 
 mod_7 <- lm(`Jump Height`~`sex`*`sport`*.,data=data5)
 print(summary(mod_7))
-
