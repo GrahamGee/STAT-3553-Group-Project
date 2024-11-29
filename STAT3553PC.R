@@ -4,6 +4,7 @@ library(lars)
 library(faraway)
 library(MASS)
 library(pls)
+library(lmtest)
 set.seed(1234)
 # Loading in the data ------------------------------------------------
 
@@ -80,6 +81,7 @@ m_foot <- m_foot |>
   relocate(sex, sport, .before = `System Weight`) |>
   mutate(across(12:90, as.numeric))
 
+par(mfrow=c(1,1))
 
 # Here I am binding all the dataframes together into one large dataframe.
 data <- bind_rows(m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
@@ -249,7 +251,12 @@ plot(removedVals$`Jump Height`,ylim=c(0,1),col="red")
 
 # Check for autocorrelation -----------------------------------------------
 
-
+dwtest(mod_2) #Many predictors
+dwtest(mod_3) #With outliers, low amount of predictors
+dwtest(mod_4) #Without outliers
+#While these indicators point towards there being autocorrelation, there shouldn't be any significant
+#issue in the data, as each jump is an individual person, and would not affect the jump of anyone else.
+#It may be the case that there are clusters of data that are similar, such as sport type, will test model with interactions to see if it performs better.
 
 # Check for influential points --------------------------------------------
 
@@ -392,11 +399,14 @@ for(i in 0:8) { #9 fold cross validation
   data3test<-data3[start_idx:end_idx,]
   plsrData3<-plsr(`Jump Height` ~ .-sex -sport,data = data3test, ncomp=10,scale=FALSE,validation="CV") #PLSR Model for data 3
   #summary(plsrData3)
-
+  print("Autocorrelation:")
+  print(dwtest(plsrData3))#Check for autocorrelation in ptrs model
+  Sys.sleep(10)
+  
   #coefplot(plsrData3, ncomp=5, xlab="Frequency")
   print("Predictors")
   print(plsrData3$loadings)
-  Sys.sleep(60)
+  Sys.sleep(10)
   
   plsData3 <- RMSEP(plsrData3, estimate="CV")
   plot(plsData3,main=i)
@@ -415,6 +425,7 @@ for(i in 0:8) { #9 fold cross validation
 #RMSE is close on all of them so that is good
 #Change data3 to data5 to test with outliers
 
+
 # Interactions ----------------------------------------------------------------
 mod_5 <- lm(`Jump Height`~`sex`*`sport`*`Impulse Ratio`,data=data5)
 print(summary(mod_5))
@@ -424,3 +435,10 @@ print(summary(mod_6))
 
 mod_7 <- lm(`Jump Height`~`sex`*`sport`*.,data=data5)
 print(summary(mod_7))
+
+#Test for autocorrelation again
+dwtest(mod_5)
+dwtest(mod_6)
+dwtest(mod_7) #The tests do not work as they likely have too many interactions, which may affect the rank of the matrix
+#These matrices are likely not full rank due to the amount of interactions in the model added.
+
