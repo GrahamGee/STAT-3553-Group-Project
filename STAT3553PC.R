@@ -105,7 +105,7 @@ data2 <- data2 |>
 rm(data, m_basket, w_basket, m_soc, w_soc, m_hock, w_hock, w_rug, m_foot)
 
 # Basic plot of all jump heights ------------------------------------------------
-plot(data2$`Jump Height`,ylim=c(0,1))
+plot(data2$`Jump Height`,ylim=c(0,1),xlab="Athlete",ylab="Jump Height in (cm)",main="Jump Height for all Athletes in CMJ Test")
 
 # LASSO on whole model ------------------------------------------------
 
@@ -189,7 +189,7 @@ length(mod_residuals)
 length(mod_fitted)
 
 plot <- ggplot(data4, aes(x = mod_fitted, y = mod_residuals)) +
-  geom_point() + xlab("Model Fitted Values") +ylab("Model Residuals") + 
+  geom_point() + xlab("Model Fitted Values") +ylab("Model Residuals") + ggtitle("Fitted vs Residual Plot")
   geom_hline(yintercept = 0)
 plot
 
@@ -215,7 +215,6 @@ par(mfrow=c(1,1))
 termplot(mod_3,partial.resid = TRUE,pch=16)
 
 # Remove Outliers  ------------------------------------------
-
 
 removeOutl<-function(dat){ #Function to remove outliers
   mod <- lm(`Jump Height` ~ .-sex -sport, data = dat)
@@ -250,10 +249,9 @@ par(mfrow=c(2,2))
 plot(mod_4) #Observe new model without outliers
 
 # Checking what values are Outliers  -----------------------------------------------
-par(mfrow=c(1,2))
-plot(data2$`Jump Height`,ylim=c(0,1))
-plot(removedVals$`Jump Height`,ylim=c(0,1),col="red")
-
+par(mfrow=c(1,1))
+plot(data2$`Jump Height`,ylim=c(0,1),xlab="Athlete",ylab="Jump Height in (cm)",main="Jump Height for all Athletes in CMJ Test")
+plot(removedVals$`Jump Height`,ylim=c(0,1),col="red",xlab="Athlete",ylab="Jump Height in (cm)",main="Jump Height for all Outlier Athletes in CMJ Test")
 
 # Check for autocorrelation -----------------------------------------------
 
@@ -281,9 +279,9 @@ plot(mod_4)
 
 # Box-Cox Transformation  -----------------------------------------------------------------
 
-#par(mfrow=c(1,1))
-#mod_5<-mod_4 #New model mod_5 for box-cox transformation
-#boxcoxTransform<-boxcox(mod_5, plotit = TRUE,lambda=seq(0,1,by=0.1))
+par(mfrow=c(1,1))
+mod_5<-mod_4 #New model mod_5 for box-cox transformation
+boxcoxTransform<-boxcox(mod_5, plotit = TRUE,lambda=seq(0,1,by=0.1))
 #Is closest to 0.9 so will try lambda=0.9
 
 #data5$`Jump HeightBX` <- (data5$`Jump Height`^0.9 - 1) / 0.9
@@ -407,15 +405,15 @@ for(i in 0:8) { #9 fold cross validation
   #summary(plsrData3)
   print("Autocorrelation:")
   print(dwtest(plsrData3))#Check for autocorrelation in ptrs model
-  Sys.sleep(10)
+  Sys.sleep(0.5)
   
   #coefplot(plsrData3, ncomp=5, xlab="Frequency")
   print("Predictors")
   print(plsrData3$loadings)
-  Sys.sleep(10)
+  Sys.sleep(0.5)
   
   plsData3 <- RMSEP(plsrData3, estimate="CV")
-  plot(plsData3,main=i)
+  plot(plsData3,main=paste("Scree plot Cross Fold:",i+1))
   
   ypred <- predict(plsrData3,ncomp=10)
   print(rmse(ypred, data3test$`Jump Height`))
@@ -435,7 +433,7 @@ par(mfrow=c(1,1))
 data3testFinal <- data3[1:7000,] #Whole training dataset
 
 plsData3 <- RMSEP(plsrData3, estimate="CV")
-plot(plsData3,main=i)
+plot(plsData3,main="Scree Plot of 10 PC's Training Data")
 
 plsrData3<-plsr(`Jump Height` ~ .-sex -sport,data = data3testFinal, ncomp=10,scale=FALSE,validation="CV") #PLSR Model on whole training set
 ypred <- predict(plsrData3,ncomp=10)
@@ -462,6 +460,7 @@ design_matrix1 <- model.matrix(~ `Relative Peak Landing Force`+`Peak Landing For
 lmod2 <- lars(design_matrix1, data2$`Jump Height`)
 lmod2
 round(lmod2$Cp,2)
+par(mfrow=c(1,1))
 plot(lmod2)
 #Remove `Peak Landing Force`, `Right Force at Peak Landing Force`,`Relative Propulsive Net Impulse`,`Relative Peak Landing Force`
 
@@ -473,16 +472,16 @@ BIC <- n*log(RSS/n)+log(n)*df #compute BIC
 GCV <- RSS/n/(1-df/n)^2 #compute GCV
 round(rbind(AIC,BIC,GCV),2)
 
-# Final Model from PCA selected predictors  ----------------------------------------------------------------
+# Model from PCA selected predictors  ----------------------------------------------------------------
 
 
-mod_Final<-lm(`Jump Height` ~ `Left Force at Peak Landing Force`+`Impulse Ratio`+`Peak Velocity`+`Peak Propulsive Power`+`Peak Relative Propulsive Power`+`Takeoff Velocity`,data=data3)
+mod_10<-lm(`Jump Height` ~ `Left Force at Peak Landing Force`+`Impulse Ratio`+`Peak Velocity`+`Peak Propulsive Power`+`Peak Relative Propulsive Power`+`Takeoff Velocity`,data=data3)
 
-summary(mod_Final)
+summary(mod_10)
 par(mfrow=c(2,2))
-plot(mod_Final) #We can conclude this model is overfitting, as the conditions are not met
+plot(mod_10) #We can conclude this model is overfitting, as the conditions are not met
 
-termplot(mod_Final,partial.resid = TRUE,pch=16)
+termplot(mod_10,partial.resid = TRUE,pch=16)
 
 
 # Interactions ----------------------------------------------------------------
@@ -501,3 +500,8 @@ dwtest(mod_6)
 dwtest(mod_7) #The tests do not work as they likely have too many interactions, which may affect the rank of the matrix
 #These matrices are likely not full rank due to the amount of interactions in the model added.
 
+# Hypothesis tests and ANOVA  ----------------------------------------------------------------
+
+summary(mod_4) #Mod 4 is the final model, as it is the most robust and meets all criteria for hypothesis testing.
+par(mfrow=c(2,2))
+plot(mod_4)
