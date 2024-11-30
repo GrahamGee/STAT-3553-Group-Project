@@ -1,3 +1,6 @@
+#STAT 3553 Group Project on CMJ Jump
+#Authors: Graham Gee, Hoang-Nam Chu, Billy Chris Muhizi
+
 library(tidyverse)
 library(readxl)
 library(lars)
@@ -118,6 +121,8 @@ indexJH<-which(colnames(design_matrix0) == "`Jump Height`")
 lmod <- lars(design_matrix0[,-indexJH], data2$`Jump Height`)
 lmod
 round(lmod$Cp,2)
+
+plot(lmod)
 
 # Multicollinearity checks ------------------------------------------------
 
@@ -472,8 +477,16 @@ BIC <- n*log(RSS/n)+log(n)*df #compute BIC
 GCV <- RSS/n/(1-df/n)^2 #compute GCV
 round(rbind(AIC,BIC,GCV),2)
 
-# Model from PCA selected predictors  ----------------------------------------------------------------
+# LASSO on VIF Model ----------------------------------------------------------------
 
+design_matrix2 <- model.matrix(~ -`Jump Height`+., data = data5)
+lmod3<-lars(design_matrix2,data5$`Jump Height`)
+lmod3
+round(lmod3$Cp,2)
+par(mfrow=c(1,1))
+plot(lmod3)
+
+# Model from PCA selected predictors  ----------------------------------------------------------------
 
 mod_10<-lm(`Jump Height` ~ `Left Force at Peak Landing Force`+`Impulse Ratio`+`Peak Velocity`+`Peak Propulsive Power`+`Peak Relative Propulsive Power`+`Takeoff Velocity`,data=data3)
 
@@ -482,7 +495,6 @@ par(mfrow=c(2,2))
 plot(mod_10) #We can conclude this model is overfitting, as the conditions are not met
 
 termplot(mod_10,partial.resid = TRUE,pch=16)
-
 
 # Interactions ----------------------------------------------------------------
 mod_5 <- lm(`Jump Height`~`sex`*`sport`*`Impulse Ratio`,data=data5)
@@ -495,13 +507,31 @@ mod_7 <- lm(`Jump Height`~`sex`*`sport`*.,data=data5)
 print(summary(mod_7))
 
 #Test for autocorrelation again
-dwtest(mod_5)
-dwtest(mod_6)
-dwtest(mod_7) #The tests do not work as they likely have too many interactions, which may affect the rank of the matrix
+#dwtest(mod_5)
+#dwtest(mod_6)
+#dwtest(mod_7) #The tests do not work as they likely have too many interactions, which may affect the rank of the matrix
 #These matrices are likely not full rank due to the amount of interactions in the model added.
 
 # Hypothesis tests and ANOVA  ----------------------------------------------------------------
 
-summary(mod_4) #Mod 4 is the final model, as it is the most robust and meets all criteria for hypothesis testing.
+summary(mod_6) #Mod 4 is the final model, as it is the most robust and meets all criteria for hypothesis testing.
 par(mfrow=c(2,2))
 plot(mod_4)
+
+mod_null1<-lm(`Jump Height`~-sex-sport+.,data=data5)
+anova(mod_null1,mod_6) #ANOVA F-Test rejects when comparing model with no sex interaction to model with sex categorical variable interactions.
+
+testPlayer<-data5[2000,] #Test player
+
+predictedJumpHeight<-predict(mod_6,testPlayer)
+
+testPlayerBBall<-testPlayer
+testPlayerBBall$sport<-"basketball"
+predictedJumpHeightBasketball<-predict(mod_6,testPlayerBBall)
+
+testPlayerBBallM<-testPlayer
+testPlayerBBallM$sex<-"m"
+predictedJumpHeightBasketballM<-predict(mod_6,testPlayerBBallM)
+
+comparingVals<-rbind(testPlayer$`Jump Height`,predictedJumpHeight,predictedJumpHeightBasketball,predictedJumpHeightBasketballM)
+print(comparingVals)
