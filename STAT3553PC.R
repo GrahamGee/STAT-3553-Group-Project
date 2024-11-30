@@ -5,6 +5,8 @@ library(faraway)
 library(MASS)
 library(pls)
 library(lmtest)
+library(Rcmdr)
+
 set.seed(1234)
 # Loading in the data ------------------------------------------------
 
@@ -208,6 +210,10 @@ plot(mod_3)
 #The Residuals vs Leverage plot has some extreme points so some influential points present and possible outliers.
 par(mfrow=c(1,1))
 
+# Check for linearity  ------------------------------------------
+par(mfrow=c(1,1))
+termplot(mod_3,partial.resid = TRUE,pch=16)
+
 # Remove Outliers  ------------------------------------------
 
 
@@ -359,7 +365,7 @@ print(round(data4Rotation[,5],2))
 print(round(data5Rotation[,5],2))
 
 
-# Comparing 5th pca values for response vars in dataset 4 with themselves in dataset 3 ------------------------
+# Comparing top 10 values of 5th pca for response vars in dataset 4 with themselves in dataset 3 ------------------------
 
 # Ensure row names are consistent between the two matrices
 rows_to_extract <- rownames(data4Rotation)
@@ -424,6 +430,59 @@ for(i in 0:8) { #9 fold cross validation
 
 #RMSE is close on all of them so that is good
 #Change data3 to data5 to test with outliers
+par(mfrow=c(1,1))
+
+data3testFinal <- data3[1:7000,] #Whole training dataset
+
+plsData3 <- RMSEP(plsrData3, estimate="CV")
+plot(plsData3,main=i)
+
+plsrData3<-plsr(`Jump Height` ~ .-sex -sport,data = data3testFinal, ncomp=10,scale=FALSE,validation="CV") #PLSR Model on whole training set
+ypred <- predict(plsrData3,ncomp=10)
+print(rmse(ypred, data3testFinal$`Jump Height`))
+
+ytpred <- predict(plsrData3, data3test2, ncomp=10)
+print(rmse(ytpred, data3test2$`Jump Height`))
+
+# Top 10 Predictors of PLSR Model ----------------------------------------------------------------
+
+rotationMatrixPLSR<-plsrData3$loading.weights
+temp2<-sort(abs(rotationMatrixPLSR[,"Comp 10"]),decreasing=TRUE)[1:10] #Using this
+temp3<-sort(abs(rotationMatrixPLSR[,"Comp 5"]),decreasing=TRUE)[1:10]
+#This hasn't produced only 1 or 2 meaningful predictors, so will scrap this idea
+
+# LASSO on PCA Model ----------------------------------------------------------------
+print(temp)
+#Model with top 10 predictors from PCA test
+mod_9 <- lm(`Jump Height` ~ `Relative Peak Landing Force`+`Peak Landing Force`+`Left Force at Peak Landing Force`+`Right Force at Peak Landing Force`+`Impulse Ratio`+`Peak Velocity`+`Peak Propulsive Power`+`Peak Relative Propulsive Power`+`Takeoff Velocity`+`Relative Propulsive Net Impulse`,data=data3)
+
+design_matrix1 <- model.matrix(~ `Relative Peak Landing Force`+`Peak Landing Force`+`Left Force at Peak Landing Force`+`Right Force at Peak Landing Force`+`Impulse Ratio`+`Peak Velocity`+`Peak Propulsive Power`+`Peak Relative Propulsive Power`+`Takeoff Velocity`+`Relative Propulsive Net Impulse`, data = data3)
+#modeDat5_2<-mode(design_matrix1)
+
+lmod2 <- lars(design_matrix1, data2$`Jump Height`)
+lmod2
+round(lmod2$Cp,2)
+plot(lmod2)
+#Remove `Peak Landing Force`, `Right Force at Peak Landing Force`,`Relative Propulsive Net Impulse`,`Relative Peak Landing Force`
+
+RSS <- lmod2$RSS #residual sum of squares for all models
+df <- lmod2$df ## number of parameters in all models
+n <- dim(data3)[1] ##number of obs.
+AIC <- n*log(RSS/n)+2*df #compute AIC
+BIC <- n*log(RSS/n)+log(n)*df #compute BIC
+GCV <- RSS/n/(1-df/n)^2 #compute GCV
+round(rbind(AIC,BIC,GCV),2)
+
+# Final Model from PCA selected predictors  ----------------------------------------------------------------
+
+
+mod_Final<-lm(`Jump Height` ~ `Left Force at Peak Landing Force`+`Impulse Ratio`+`Peak Velocity`+`Peak Propulsive Power`+`Peak Relative Propulsive Power`+`Takeoff Velocity`,data=data3)
+
+summary(mod_Final)
+par(mfrow=c(2,2))
+plot(mod_Final) #We can conclude this model is overfitting, as the conditions are not met
+
+termplot(mod_Final,partial.resid = TRUE,pch=16)
 
 
 # Interactions ----------------------------------------------------------------
